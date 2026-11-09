@@ -1,0 +1,1089 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Instagram follow-back</title>
+<style>
+  :root {
+    --bg: #0f1115; --card: #1a1d24; --line: #2a2f3a;
+    --text: #f2f4f8; --muted: #9aa3b2; --accent: #6ea8ff;
+    --warn: #e6b84d; --danger: #e07070;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font: 16px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--bg); color: var(--text);
+  }
+  main { max-width: 920px; margin: 0 auto; padding: 28px 20px 64px; }
+  h1 { font-size: 1.6rem; margin: 0 0 8px; }
+  .sub { color: var(--muted); margin-bottom: 20px; }
+  .stats { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 18px; }
+  .stat, .tab, .btn {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 12px; padding: 10px 14px; color: var(--text);
+  }
+  .tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+  .tab { cursor: pointer; font: inherit; }
+  .tab.active { border-color: var(--accent); color: var(--accent); }
+  .toolbar {
+    display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+    margin: 0 0 12px;
+  }
+  .btn { cursor: pointer; font: inherit; }
+  .btn:hover { border-color: var(--accent); }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .btn.primary {
+    background: #1d3050; border-color: #35558a; color: var(--accent);
+  }
+  input[type="search"] {
+    width: 100%; margin: 0 0 16px; padding: 12px 14px;
+    border-radius: 12px; border: 1px solid var(--line);
+    background: var(--card); color: var(--text); font: inherit;
+  }
+  .list { display: grid; gap: 8px; }
+  .card {
+    display: grid; grid-template-columns: 40px 1fr auto;
+    column-gap: 12px; align-items: center; padding: 10px 12px;
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 12px; color: inherit; text-decoration: none;
+  }
+  .card:hover { border-color: var(--accent); }
+  .av {
+    position: relative;
+    width: 40px; height: 40px; border-radius: 50%;
+    display: grid; place-items: center; font-weight: 700; color: #fff;
+    overflow: hidden;
+    grid-row: 1 / span 2;
+  }
+  .av img {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    object-fit: cover;
+  }
+  .name { font-weight: 600; grid-column: 2; }
+  .subs { grid-column: 2; color: var(--muted); font-size: 0.82rem; }
+  .go { color: var(--accent); font-size: 0.9rem; grid-row: 1 / span 2; }
+  .pane { display: none; }
+  .pane.active { display: block; }
+  .empty { color: var(--muted); padding: 18px 4px; }
+  .drop {
+    border: 1px dashed var(--line);
+    border-radius: 16px;
+    padding: 22px 18px;
+    background: #14171e;
+    margin-bottom: 18px;
+    transition: border-color .12s ease, background .12s ease;
+  }
+  .drop.drag {
+    border-color: var(--accent);
+    background: #172033;
+  }
+  .drop h2 {
+    margin: 0 0 8px;
+    font-size: 1.05rem;
+  }
+  .drop ol {
+    margin: 0 0 14px;
+    padding-left: 1.2rem;
+    color: var(--muted);
+  }
+  .drop ol li { margin: 4px 0; }
+  .drop .row {
+    display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
+  }
+  .drop input[type="file"] { display: none; }
+  .msg {
+    display: none;
+    margin: 0 0 14px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 1px solid var(--line);
+    background: var(--card);
+    color: var(--text);
+    white-space: pre-wrap;
+  }
+  .msg.show { display: block; }
+  .msg.warn { border-color: #6a5520; color: #f0d48a; }
+  .msg.error { border-color: #6a3030; color: #f0a0a0; }
+  .msg.ok { border-color: #2a4a35; color: #a8d7b5; }
+  .status {
+    color: var(--muted);
+    font-size: 0.9rem;
+    min-height: 1.2em;
+    margin: 0 0 12px;
+  }
+  .limits {
+    margin-top: 28px;
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 0.86rem;
+  }
+  .limits strong { color: var(--text); font-weight: 600; }
+  #hovercard {
+    position: fixed;
+    z-index: 40;
+    width: 400px;
+    padding: 12px;
+    background: #161920;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    box-shadow: 0 18px 50px rgba(0,0,0,.5);
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(6px);
+    transition: opacity .12s ease, transform .12s ease;
+  }
+  #hovercard.show {
+    opacity: 1;
+    pointer-events: auto;
+    transform: none;
+  }
+  #hovercard .preview {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+  #hovercard .who { font-weight: 700; font-size: 1.05rem; word-break: break-all; }
+  #hovercard .kind { color: var(--muted); font-size: .85rem; margin-top: 2px; }
+  #hovercard .frame-wrap {
+    position: relative;
+    width: 100%;
+    height: min(62vh, 560px);
+    border-radius: 12px;
+    overflow: hidden;
+    background: #0b0d12;
+    margin-bottom: 10px;
+  }
+  #hovercard iframe {
+    width: 100%;
+    height: 100%;
+    border: 0;
+    background: #fff;
+  }
+  #hovercard .actions { display: flex; gap: 8px; }
+  #hovercard .actions a, #hovercard .actions button {
+    flex: 1;
+    text-align: center;
+    border-radius: 10px;
+    padding: 9px 10px;
+    border: 1px solid var(--line);
+    background: var(--card);
+    color: var(--text);
+    font: inherit;
+    cursor: pointer;
+    text-decoration: none;
+  }
+  #hovercard .actions a {
+    background: #1d3050;
+    border-color: #35558a;
+    color: var(--accent);
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Instagram follow-back</h1>
+  <p class="sub">Local follow-back checker from Meta’s official export. No Instagram password. Drop your ZIP below; lists stay on this computer.</p>
+
+  <div class="drop" id="drop">
+    <h2>Load your export</h2>
+    <ol>
+      <li>Instagram → Accounts Center → Download your information</li>
+      <li>Select <strong>Followers and following</strong> only</li>
+      <li>Format <strong>JSON</strong> (HTML also works)</li>
+      <li>Date range <strong>All time</strong> — shorter ranges omit older followers</li>
+      <li>Drop the ZIP here or choose a file</li>
+    </ol>
+    <div class="row">
+      <button type="button" class="btn primary" id="pick-btn">Choose ZIP</button>
+      <input id="file" type="file" accept=".zip,application/zip">
+      <span class="status" id="import-hint">Or drag and drop onto this page. Full dumps (multi‑GB) are parsed on the local server — keep this page open via <code>python3 app.py</code>.</span>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <input id="local-path" type="text" placeholder="Or paste a local ZIP path (fast for large dumps)" style="flex:1;min-width:220px;margin:0;padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--text);font:inherit">
+      <button type="button" class="btn" id="path-btn">Import path</button>
+    </div>
+  </div>
+
+  <div class="msg" id="msg" role="status"></div>
+
+  <div class="stats">
+    <div class="stat">Not following back: <b id="stat-notback">0</b></div>
+    <div class="stat">Fans: <b id="stat-fans">0</b></div>
+    <div class="stat">Mutuals: <b id="stat-mutuals">0</b></div>
+    <div class="stat">Followers: <b id="stat-followers">0</b></div>
+    <div class="stat">Following: <b id="stat-following">0</b></div>
+    <div class="stat">Cached profiles: <b id="cache-count">0</b></div>
+  </div>
+
+  <div class="tabs">
+    <button type="button" class="tab active" data-tab="notback">Not following back</button>
+    <button type="button" class="tab" data-tab="fans">Fans</button>
+    <button type="button" class="tab" data-tab="mutuals">Mutuals</button>
+  </div>
+
+  <div class="toolbar">
+    <button type="button" class="btn" data-sort="followers-desc">Most followers</button>
+    <button type="button" class="btn" data-sort="followers-asc">Fewest followers</button>
+    <button type="button" class="btn" data-sort="original">Original</button>
+    <button type="button" class="btn" id="fill-start">Fill cache slowly</button>
+    <button type="button" class="btn" id="fill-pause" disabled>Pause</button>
+    <button type="button" class="btn" id="fill-stop" disabled>Stop</button>
+  </div>
+  <p class="status" id="fill-status"></p>
+
+  <input id="q" type="search" placeholder="Search username" autocomplete="off">
+
+  <section class="pane active" id="notback"><div class="list"><p class="empty">No list loaded yet. Import an Instagram export to see who does not follow you back.</p></div></section>
+  <section class="pane" id="fans"><div class="list"><p class="empty">No list loaded yet.</p></div></section>
+  <section class="pane" id="mutuals"><div class="list"><p class="empty">No list loaded yet.</p></div></section>
+
+  <aside class="limits" id="limits">
+    <strong>Limits.</strong>
+    Works from Instagram’s official export, not a live follower API.
+    Request JSON + All time — a shorter range omits old followers and false-flags mutuals.
+    Hover preview uses Instagram’s public embed; private accounts and profiles with embedding off stay blank — use Open Instagram.
+    Follower counts and photos are cached after you open a preview (or run slow fill); they can be stale.
+    Fill cache slowly walks public embeds with long delays and does not log in; it can still hit IP rate limits — pause if errors appear.
+    Nothing is uploaded to this project’s authors; data stays on this computer.
+  </aside>
+</main>
+
+<div id="hovercard" hidden>
+  <div class="preview">
+    <div>
+      <div class="who" id="hc-name"></div>
+      <div class="kind" id="hc-kind"></div>
+    </div>
+  </div>
+  <div class="frame-wrap">
+    <iframe id="hc-frame" title="Instagram profile" referrerpolicy="no-referrer-when-downgrade" loading="eager"></iframe>
+  </div>
+  <div class="actions">
+    <a id="hc-open" target="_blank" rel="noopener noreferrer">Open Instagram</a>
+    <button type="button" id="hc-copy">Copy</button>
+  </div>
+</div>
+
+<script src="vendor/jszip.min.js"></script>
+<script>
+(function () {
+  const CACHE_KEY = "igFollowbackCache";
+  const LISTS_KEY = "igFollowbackLists";
+  const CACHE_API = ""; // same origin when served by app.py
+  const USER_RE = /^[A-Za-z0-9._]{1,30}$/;
+  const SKIP = new Set(["accounts", "about", "legal", "explore", "reels", "direct", "p", "reel", "stories", "tv", "_u"]);
+
+  const kinds = {
+    notback: "Not following back",
+    fans: "Fan — follows you",
+    mutuals: "Mutual"
+  };
+
+  /** @type {{ notback: string[], fans: string[], mutuals: string[], followers: number, following: number, order: Record<string, number> } | null} */
+  let lists = null;
+  let sortMode = "original";
+  const cardsByUser = new Map();
+  const inflight = new Set();
+
+  const tabs = document.querySelectorAll(".tab");
+  const panes = document.querySelectorAll(".pane");
+  const q = document.getElementById("q");
+  const drop = document.getElementById("drop");
+  const fileInput = document.getElementById("file");
+  const pickBtn = document.getElementById("pick-btn");
+  const msgEl = document.getElementById("msg");
+  const fillStatus = document.getElementById("fill-status");
+  const fillStart = document.getElementById("fill-start");
+  const fillPause = document.getElementById("fill-pause");
+  const fillStop = document.getElementById("fill-stop");
+
+  const hover = document.getElementById("hovercard");
+  const hcName = document.getElementById("hc-name");
+  const hcKind = document.getElementById("hc-kind");
+  const hcOpen = document.getElementById("hc-open");
+  const hcCopy = document.getElementById("hc-copy");
+  const hcFrame = document.getElementById("hc-frame");
+  let hideTimer = 0;
+  let loadTimer = 0;
+  let currentCard = null;
+  let currentUser = "";
+
+  let fillState = "idle"; // idle | running | paused
+  let fillAbort = false;
+
+  function showMsg(text, kind) {
+    msgEl.textContent = text;
+    msgEl.className = "msg show" + (kind ? " " + kind : "");
+  }
+  function clearMsg() {
+    msgEl.textContent = "";
+    msgEl.className = "msg";
+  }
+
+  function loadLocal() {
+    try { return JSON.parse(localStorage.getItem(CACHE_KEY) || "{}"); }
+    catch { return {}; }
+  }
+  function saveLocal(data) {
+    localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+  }
+  function loadLists() {
+    try { return JSON.parse(localStorage.getItem(LISTS_KEY) || "null"); }
+    catch { return null; }
+  }
+  function saveLists(data) {
+    localStorage.setItem(LISTS_KEY, JSON.stringify(data));
+  }
+
+  function formatCount(n) {
+    if (n == null || n === "") return "";
+    n = Number(n);
+    if (!Number.isFinite(n)) return "";
+    if (n >= 1e6) return (n / 1e6).toFixed(n >= 1e7 ? 0 : 1).replace(/\.0$/, "") + "M";
+    if (n >= 1e3) return (n / 1e3).toFixed(n >= 1e4 ? 0 : 1).replace(/\.0$/, "") + "K";
+    return String(n);
+  }
+
+  function colorFor(user) {
+    let h = 2166136261;
+    for (let i = 0; i < user.length; i++) {
+      h ^= user.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    const hue = (h >>> 0) % 360;
+    return `hsl(${hue} 52% 36%)`;
+  }
+
+  function usernameOf(card) {
+    return (card.querySelector(".name")?.textContent || "").replace(/^@/, "").trim();
+  }
+
+  function kindLine(card, data) {
+    const pane = card?.closest(".pane")?.id || "";
+    const bits = [kinds[pane] || ""];
+    if (data?.followers != null) bits.push(formatCount(data.followers) + " followers");
+    return bits.filter(Boolean).join(" · ");
+  }
+
+  function applyToCard(card, data) {
+    if (!card || !data) return;
+    const av = card.querySelector(".av");
+    if (data.avatar && av && !av.querySelector("img")) {
+      const img = document.createElement("img");
+      img.alt = "";
+      img.referrerPolicy = "no-referrer";
+      img.src = data.avatar;
+      av.appendChild(img);
+    }
+    if (data.followers != null) {
+      let subs = card.querySelector(".subs");
+      if (!subs) {
+        subs = document.createElement("div");
+        subs.className = "subs";
+        card.querySelector(".name")?.after(subs);
+      }
+      subs.textContent = formatCount(data.followers) + " followers";
+    }
+  }
+
+  function applyAll(cache) {
+    document.querySelectorAll(".card").forEach(card => {
+      const user = usernameOf(card).toLowerCase();
+      if (cache[user]) applyToCard(card, cache[user]);
+    });
+    const el = document.getElementById("cache-count");
+    if (el) el.textContent = String(Object.keys(cache).length);
+  }
+
+  function remember(user, data) {
+    const cache = loadLocal();
+    const key = user.toLowerCase();
+    cache[key] = { ...(cache[key] || {}), ...data, username: user, ts: Date.now() };
+    saveLocal(cache);
+    (cardsByUser.get(key) || []).forEach(card => applyToCard(card, cache[key]));
+    const el = document.getElementById("cache-count");
+    if (el) el.textContent = String(Object.keys(cache).length);
+    if (currentUser.toLowerCase() === key && currentCard) {
+      hcKind.textContent = kindLine(currentCard, cache[key]);
+    }
+    return cache[key];
+  }
+
+  async function fetchProfile(user) {
+    const key = user.toLowerCase();
+    if (inflight.has(key)) return null;
+    inflight.add(key);
+    try {
+      const res = await fetch(CACHE_API + "/profile/" + encodeURIComponent(user));
+      if (!res.ok) return null;
+      const data = await res.json();
+      if (data && (data.followers != null || data.avatar)) {
+        remember(user, data);
+        return data;
+      }
+      return null;
+    } catch {
+      return null;
+    } finally {
+      inflight.delete(key);
+    }
+  }
+
+  function makeCard(user) {
+    const a = document.createElement("a");
+    a.className = "card";
+    a.href = "https://www.instagram.com/" + encodeURIComponent(user) + "/";
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    a.dataset.user = user;
+    const initial = (user[0] || "?").toUpperCase();
+    a.innerHTML =
+      '<span class="av" style="background:' + colorFor(user) + '">' + initial + "</span>" +
+      '<span class="name">@' + user + "</span>" +
+      '<span class="go">Open Instagram</span>';
+    a.addEventListener("mouseenter", () => showHover(a));
+    return a;
+  }
+
+  function emptyHtml(text) {
+    return '<p class="empty">' + text + "</p>";
+  }
+
+  function sortedUsers(users) {
+    const cache = loadLocal();
+    const order = lists?.order || {};
+    const arr = users.slice();
+    if (sortMode === "followers-desc" || sortMode === "followers-asc") {
+      const dir = sortMode === "followers-desc" ? -1 : 1;
+      arr.sort((a, b) => {
+        const fa = cache[a.toLowerCase()]?.followers;
+        const fb = cache[b.toLowerCase()]?.followers;
+        const na = fa == null ? (dir > 0 ? Infinity : -Infinity) : Number(fa);
+        const nb = fb == null ? (dir > 0 ? Infinity : -Infinity) : Number(fb);
+        if (na !== nb) return (na - nb) * dir;
+        return a.localeCompare(b);
+      });
+    } else {
+      arr.sort((a, b) => (order[a.toLowerCase()] ?? 0) - (order[b.toLowerCase()] ?? 0));
+    }
+    return arr;
+  }
+
+  function wireCardIndex() {
+    cardsByUser.clear();
+    document.querySelectorAll(".card").forEach(card => {
+      const key = usernameOf(card).toLowerCase();
+      if (!cardsByUser.has(key)) cardsByUser.set(key, []);
+      cardsByUser.get(key).push(card);
+    });
+  }
+
+  function renderLists() {
+    const emptyDefault = {
+      notback: "No list loaded yet. Import an Instagram export to see who does not follow you back.",
+      fans: "No list loaded yet.",
+      mutuals: "No list loaded yet."
+    };
+    ["notback", "fans", "mutuals"].forEach(id => {
+      const pane = document.getElementById(id);
+      const list = pane.querySelector(".list");
+      const users = lists ? sortedUsers(lists[id] || []) : [];
+      list.innerHTML = "";
+      if (!users.length) {
+        list.innerHTML = emptyHtml(lists ? "Nobody in this list." : emptyDefault[id]);
+        return;
+      }
+      const frag = document.createDocumentFragment();
+      users.forEach(u => frag.appendChild(makeCard(u)));
+      list.appendChild(frag);
+    });
+
+    document.getElementById("stat-notback").textContent = String(lists?.notback?.length || 0);
+    document.getElementById("stat-fans").textContent = String(lists?.fans?.length || 0);
+    document.getElementById("stat-mutuals").textContent = String(lists?.mutuals?.length || 0);
+    document.getElementById("stat-followers").textContent = String(lists?.followers || 0);
+    document.getElementById("stat-following").textContent = String(lists?.following || 0);
+
+    wireCardIndex();
+    applyAll(loadLocal());
+    filter();
+  }
+
+  function filter() {
+    const needle = q.value.trim().toLowerCase();
+    document.querySelectorAll(".pane.active .card").forEach(card => {
+      card.style.display = card.textContent.toLowerCase().includes(needle) ? "" : "none";
+    });
+  }
+
+  tabs.forEach(tab => tab.addEventListener("click", () => {
+    tabs.forEach(t => t.classList.remove("active"));
+    panes.forEach(p => p.classList.remove("active"));
+    tab.classList.add("active");
+    document.getElementById(tab.dataset.tab).classList.add("active");
+    hideHover();
+    filter();
+  }));
+  q.addEventListener("input", filter);
+
+  document.querySelectorAll("[data-sort]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      sortMode = btn.dataset.sort;
+      if (lists) renderLists();
+    });
+  });
+
+  function placeHover(card) {
+    const r = card.getBoundingClientRect();
+    const w = hover.offsetWidth || 400;
+    const h = hover.offsetHeight || 620;
+    let left = r.right + 10;
+    let top = r.top;
+    if (left + w > window.innerWidth - 12) left = r.left - w - 10;
+    if (left < 12) left = 12;
+    if (top + h > window.innerHeight - 12) top = window.innerHeight - h - 12;
+    if (top < 12) top = 12;
+    hover.style.left = left + "px";
+    hover.style.top = top + "px";
+  }
+
+  function showHover(card) {
+    clearTimeout(hideTimer);
+    currentCard = card;
+    const user = usernameOf(card);
+    const cached = loadLocal()[user.toLowerCase()];
+    hcName.textContent = "@" + user;
+    hcKind.textContent = kindLine(card, cached);
+    hcOpen.href = card.href;
+    hcCopy.textContent = "Copy";
+    hover.hidden = false;
+    hover.classList.add("show");
+    placeHover(card);
+    fetchProfile(user);
+    if (currentUser === user && hcFrame.src) return;
+    currentUser = user;
+    clearTimeout(loadTimer);
+    hcFrame.removeAttribute("src");
+    loadTimer = setTimeout(() => {
+      hcFrame.src = "https://www.instagram.com/" + encodeURIComponent(user) + "/embed/";
+    }, 160);
+  }
+
+  function hideHover() {
+    clearTimeout(hideTimer);
+    clearTimeout(loadTimer);
+    currentCard = null;
+    currentUser = "";
+    hover.classList.remove("show");
+    hover.hidden = true;
+    hcFrame.removeAttribute("src");
+  }
+  function hideSoon() {
+    clearTimeout(hideTimer);
+    hideTimer = setTimeout(hideHover, 180);
+  }
+  function overPopupOrCard(target) {
+    return !!(target && (hover.contains(target) || (currentCard && currentCard.contains(target))));
+  }
+
+  document.addEventListener("mousemove", (e) => {
+    if (!currentCard) return;
+    if (overPopupOrCard(e.target) || e.target === hcFrame) {
+      clearTimeout(hideTimer);
+      return;
+    }
+    hideSoon();
+  });
+  window.addEventListener("scroll", () => { if (currentCard) placeHover(currentCard); }, { passive: true });
+
+  hcCopy.addEventListener("click", async () => {
+    const user = hcName.textContent.replace(/^@/, "");
+    try {
+      await navigator.clipboard.writeText(user);
+      hcCopy.textContent = "Copied";
+    } catch {
+      hcCopy.textContent = user;
+    }
+  });
+
+  function isValidUser(u) {
+    if (!u || !USER_RE.test(u)) return false;
+    if (SKIP.has(u.toLowerCase())) return false;
+    if (u.toLowerCase().startsWith("__deleted__")) return false;
+    return true;
+  }
+
+  function extractFromUrl(url) {
+    if (!url) return null;
+    const m = String(url).match(/instagram\.com\/(?:_u\/)?([A-Za-z0-9._]{1,30})/i);
+    if (!m) return null;
+    const u = m[1];
+    return isValidUser(u) ? u : null;
+  }
+
+  function extractFromEntry(entry) {
+    if (!entry || typeof entry !== "object") return { user: null, ts: null };
+    let user = null;
+    const sld = entry.string_list_data;
+    if (Array.isArray(sld) && sld[0]) {
+      const v = sld[0].value;
+      if (typeof v === "string" && USER_RE.test(v) && isValidUser(v)) user = v;
+      if (!user) user = extractFromUrl(sld[0].href);
+    }
+    if (!user && typeof entry.title === "string" && USER_RE.test(entry.title) && isValidUser(entry.title)) {
+      user = entry.title;
+    }
+    if (!user && entry.href) user = extractFromUrl(entry.href);
+    let ts = null;
+    if (Array.isArray(sld) && sld[0] && typeof sld[0].timestamp === "number") ts = sld[0].timestamp;
+    else if (typeof entry.timestamp === "number") ts = entry.timestamp;
+    return { user, ts };
+  }
+
+  function addUser(map, user, ts, preferExistingSpelling) {
+    if (!user || !isValidUser(user)) return;
+    const key = user.toLowerCase();
+    const prev = map.get(key);
+    if (!prev) {
+      map.set(key, { user, ts: ts ?? null });
+      return;
+    }
+    if (preferExistingSpelling) {
+      // keep following spelling when merging
+      if (ts != null && (prev.ts == null || ts < prev.ts)) prev.ts = ts;
+    } else {
+      prev.user = user;
+      if (ts != null && (prev.ts == null || ts < prev.ts)) prev.ts = ts;
+    }
+  }
+
+  function parseJsonFollowers(text) {
+    const data = JSON.parse(text);
+    const arr = Array.isArray(data) ? data : (data.relationships_followers || data.followers || []);
+    const map = new Map();
+    const timestamps = [];
+    (arr || []).forEach(entry => {
+      const { user, ts } = extractFromEntry(entry);
+      if (user) {
+        addUser(map, user, ts, false);
+        if (ts != null) timestamps.push(ts);
+      }
+    });
+    return { map, timestamps };
+  }
+
+  function parseJsonFollowing(text) {
+    const data = JSON.parse(text);
+    const arr = Array.isArray(data)
+      ? data
+      : (data.relationships_following || data.following || []);
+    const map = new Map();
+    const timestamps = [];
+    (arr || []).forEach(entry => {
+      const { user, ts } = extractFromEntry(entry);
+      if (user) {
+        addUser(map, user, ts, false);
+        if (ts != null) timestamps.push(ts);
+      }
+    });
+    return { map, timestamps };
+  }
+
+  function parseHtmlFollowers(html) {
+    const map = new Map();
+    const timestamps = [];
+    const re = /href=["']https?:\/\/(?:www\.)?instagram\.com\/(?:_u\/)?([A-Za-z0-9._]{1,30})\/?["']/gi;
+    let m;
+    while ((m = re.exec(html))) {
+      const u = m[1];
+      if (isValidUser(u)) addUser(map, u, null, false);
+    }
+    return { map, timestamps };
+  }
+
+  function parseHtmlFollowing(html) {
+    const map = new Map();
+    const timestamps = [];
+    // Prefer h2 text when it is a valid username
+    const blockRe = /<h2[^>]*>\s*([A-Za-z0-9._]{1,30})\s*<\/h2>[\s\S]{0,400}?instagram\.com\/(?:_u\/)?([A-Za-z0-9._]{1,30})/gi;
+    let m;
+    const seen = new Set();
+    while ((m = blockRe.exec(html))) {
+      const fromH2 = m[1];
+      const fromUrl = m[2];
+      const u = isValidUser(fromH2) ? fromH2 : (isValidUser(fromUrl) ? fromUrl : null);
+      if (u) {
+        addUser(map, u, null, false);
+        seen.add(u.toLowerCase());
+      }
+    }
+    const re = /href=["']https?:\/\/(?:www\.)?instagram\.com\/(?:_u\/)?([A-Za-z0-9._]{1,30})\/?["']/gi;
+    while ((m = re.exec(html))) {
+      const u = m[1];
+      if (isValidUser(u) && !seen.has(u.toLowerCase())) addUser(map, u, null, false);
+    }
+    return { map, timestamps };
+  }
+
+  function buildSets(followersMap, followingMap) {
+    const notback = [];
+    const fans = [];
+    const mutuals = [];
+    const order = {};
+    let i = 0;
+    followingMap.forEach((v, key) => {
+      order[key] = i++;
+      if (followersMap.has(key)) mutuals.push(v.user);
+      else notback.push(v.user);
+    });
+    followersMap.forEach((v, key) => {
+      if (!(key in order)) order[key] = i++;
+      if (!followingMap.has(key)) fans.push(v.user);
+    });
+    return {
+      notback,
+      fans,
+      mutuals,
+      followers: followersMap.size,
+      following: followingMap.size,
+      order
+    };
+  }
+
+  function maybeIncompleteWarning(followerTs, followingTs, followerCount, followingCount) {
+    if (!followerTs.length || !followingTs.length) {
+      if (followingCount > 50 && followerCount > 0 && followerCount < followingCount * 0.35) {
+        return "Follower count looks small vs following. If you picked a 1-year (or other short) date range, re-request the export with All time — shorter ranges omit older followers and mislabel mutuals.";
+      }
+      return null;
+    }
+    const minF = Math.min(...followerTs);
+    const minG = Math.min(...followingTs);
+    // If followers start much later than following (~> 180 days), likely a truncated window
+    if (minF - minG > 180 * 24 * 3600) {
+      return "This export looks incomplete: follower timestamps start much later than following. Re-request Followers and following with date range All time.";
+    }
+    if (followingCount > 50 && followerCount < followingCount * 0.35) {
+      return "Follower count looks small vs following. Prefer an All time JSON export — a 1-year range omits older followers.";
+    }
+    return null;
+  }
+
+  const SERVER_IMPORT_BYTES = 40 * 1024 * 1024; // prefer server for big / full dumps
+
+  function preferConnections(paths) {
+    const pref = paths.filter(n => /followers_and_following/i.test(n));
+    return pref.length ? pref : paths;
+  }
+
+  async function readZipEntries(buffer) {
+    if (typeof JSZip === "undefined") throw new Error("JSZip failed to load. Serve this page via python3 app.py so vendor/jszip.min.js is available.");
+    const zip = await JSZip.loadAsync(buffer);
+    const files = {};
+    const names = Object.keys(zip.files);
+    for (const name of names) {
+      const entry = zip.files[name];
+      if (entry.dir) continue;
+      const base = name.split("/").pop() || name;
+      files[base.toLowerCase()] = { name, entry, base };
+      files[name.toLowerCase()] = { name, entry, base };
+    }
+    return { zip, files, names };
+  }
+
+  async function importFromZipBuffer(buffer) {
+    const { files, names } = await readZipEntries(buffer);
+    const followerJsonPaths = preferConnections(names.filter(n => /(^|\/)followers_\d+\.json$/i.test(n)));
+    const followerHtmlPaths = preferConnections(names.filter(n => /(^|\/)followers_\d+\.html$/i.test(n)));
+    const followingJsonPaths = preferConnections(names.filter(n => /(^|\/)following\.json$/i.test(n)));
+    const followingHtmlPaths = preferConnections(names.filter(n => /(^|\/)following\.html$/i.test(n)));
+
+    const followersMap = new Map();
+    const followingMap = new Map();
+    const followerTs = [];
+    const followingTs = [];
+    let used = null;
+
+    async function readPath(path) {
+      const entry = files[path.toLowerCase()]?.entry;
+      if (!entry) return null;
+      return entry.async("string");
+    }
+
+    if (followerJsonPaths.length && followingJsonPaths.length) {
+      used = "json";
+      for (const path of followerJsonPaths) {
+        const text = await readPath(path);
+        if (!text) continue;
+        const parsed = parseJsonFollowers(text);
+        parsed.map.forEach((v) => addUser(followersMap, v.user, v.ts, false));
+        followerTs.push(...parsed.timestamps);
+      }
+      const fText = await readPath(followingJsonPaths[0]);
+      if (fText) {
+        const parsed = parseJsonFollowing(fText);
+        parsed.map.forEach((v) => addUser(followingMap, v.user, v.ts, false));
+        followingTs.push(...parsed.timestamps);
+      }
+    } else if (followerHtmlPaths.length && followingHtmlPaths.length) {
+      used = "html";
+      for (const path of followerHtmlPaths) {
+        const text = await readPath(path);
+        if (!text) continue;
+        const parsed = parseHtmlFollowers(text);
+        parsed.map.forEach((v) => addUser(followersMap, v.user, v.ts, false));
+      }
+      const fText = await readPath(followingHtmlPaths[0]);
+      if (fText) {
+        const parsed = parseHtmlFollowing(fText);
+        parsed.map.forEach((v) => addUser(followingMap, v.user, v.ts, false));
+      }
+    } else {
+      throw new Error(
+        "No follower/following files found.\n" +
+        "Expected JSON: connections/followers_and_following/followers_1.json + following.json\n" +
+        "Or HTML: followers_1.html + following.html\n" +
+        "Make sure you selected Followers and following in Accounts Center."
+      );
+    }
+
+    if (!followersMap.size && !followingMap.size) {
+      throw new Error("Files were found but no usernames could be parsed. Try the JSON export format.");
+    }
+
+    const built = buildSets(followersMap, followingMap);
+    const warn = maybeIncompleteWarning(followerTs, followingTs, built.followers, built.following);
+    return { built, warn, used };
+  }
+
+  function applyImportResult(built, warn, used) {
+    lists = built;
+    saveLists(lists);
+    renderLists();
+    let ok = "Loaded " + String(used || "export").toUpperCase() + " export: " +
+      built.following + " following, " + built.followers + " followers → " +
+      built.notback.length + " not following back, " +
+      built.fans.length + " fans, " +
+      built.mutuals.length + " mutuals.";
+    if (warn) showMsg(ok + "\n\n" + warn, "warn");
+    else showMsg(ok, "ok");
+  }
+
+  async function importViaServerFile(file) {
+    showMsg("Uploading to local server (large dump — may take a few minutes)…\nOnly followers/following JSON is read; media is ignored.", "ok");
+    const res = await fetch("/import", {
+      method: "POST",
+      headers: { "Content-Type": "application/zip" },
+      body: file
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || ("Import failed (" + res.status + ")"));
+    applyImportResult(data.lists, data.warn, data.used);
+  }
+
+  async function importViaServerPath(path) {
+    showMsg("Importing from local path…", "ok");
+    const res = await fetch("/import-path", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || ("Import failed (" + res.status + ")"));
+    applyImportResult(data.lists, data.warn, data.used);
+  }
+
+  async function handleFile(file) {
+    if (!file) return;
+    clearMsg();
+    const sizeMb = (file.size / (1024 * 1024)).toFixed(1);
+    showMsg("Reading " + file.name + " (" + sizeMb + " MB)…", "ok");
+    try {
+      // Large / full Instagram dumps: parse on the local Python server (reads only the small JSON entries).
+      if (file.size >= SERVER_IMPORT_BYTES) {
+        await importViaServerFile(file);
+        return;
+      }
+      // Snapshot bytes immediately so clearing the <input> cannot revoke the File handle mid-read.
+      const buffer = await file.arrayBuffer();
+      const { built, warn, used } = await importFromZipBuffer(buffer);
+      applyImportResult(built, warn, used);
+    } catch (err) {
+      const msg = String(err && err.message ? err.message : err);
+      if (/could not be read|NotReadableError|NotFoundError/i.test(msg)) {
+        showMsg(
+          "Could not read that file (browser lost access).\n" +
+          "For multi‑GB dumps, paste the full path below and click Import path — faster and more reliable.",
+          "error"
+        );
+      } else {
+        showMsg(msg, "error");
+      }
+    }
+  }
+
+  pickBtn.addEventListener("click", () => fileInput.click());
+  fileInput.addEventListener("change", async () => {
+    const f = fileInput.files && fileInput.files[0];
+    try {
+      await handleFile(f);
+    } finally {
+      fileInput.value = "";
+    }
+  });
+
+  const pathInput = document.getElementById("local-path");
+  const pathBtn = document.getElementById("path-btn");
+  pathBtn.addEventListener("click", async () => {
+    const path = (pathInput.value || "").trim();
+    if (!path) {
+      showMsg("Paste the full path to your .zip export.", "error");
+      return;
+    }
+    try {
+      await importViaServerPath(path);
+    } catch (err) {
+      showMsg(String(err.message || err), "error");
+    }
+  });
+
+  ["dragenter", "dragover"].forEach(ev => {
+    window.addEventListener(ev, e => {
+      e.preventDefault();
+      drop.classList.add("drag");
+    });
+  });
+  ["dragleave", "drop"].forEach(ev => {
+    window.addEventListener(ev, e => {
+      e.preventDefault();
+      if (ev === "dragleave") drop.classList.remove("drag");
+    });
+  });
+  window.addEventListener("drop", e => {
+    e.preventDefault();
+    drop.classList.remove("drag");
+    const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f) handleFile(f);
+  });
+
+  function sleep(ms) {
+    return new Promise(r => setTimeout(r, ms));
+  }
+
+  function updateFillButtons() {
+    fillStart.disabled = fillState === "running";
+    fillPause.disabled = fillState !== "running" && fillState !== "paused";
+    fillStop.disabled = fillState === "idle";
+    fillPause.textContent = fillState === "paused" ? "Resume" : "Pause";
+  }
+
+  async function waitWhilePaused() {
+    while (fillState === "paused" && !fillAbort) await sleep(200);
+  }
+
+  async function runSlowFill() {
+    if (!lists) {
+      fillStatus.textContent = "Import a list first.";
+      return;
+    }
+    const queue = [];
+    const seen = new Set();
+    const cache = loadLocal();
+    ["notback", "fans", "mutuals"].forEach(id => {
+      (lists[id] || []).forEach(u => {
+        const k = u.toLowerCase();
+        if (seen.has(k)) return;
+        seen.add(k);
+        const c = cache[k];
+        if (c && (c.followers != null || c.avatar)) return;
+        queue.push(u);
+      });
+    });
+    if (!queue.length) {
+      fillStatus.textContent = "Nothing to fill — all visible profiles already cached.";
+      return;
+    }
+
+    fillAbort = false;
+    fillState = "running";
+    updateFillButtons();
+    let errors = 0;
+    for (let i = 0; i < queue.length; i++) {
+      if (fillAbort) break;
+      await waitWhilePaused();
+      if (fillAbort) break;
+      const user = queue[i];
+      fillStatus.textContent =
+        "Filling " + (i + 1) + "/" + queue.length + ": @" + user +
+        " — waiting 15–25s between profiles. Pause on rate-limit errors.";
+      const data = await fetchProfile(user);
+      if (!data) {
+        errors += 1;
+        fillStatus.textContent =
+          "No data for @" + user + " (private, embed blocked, or helper offline). Errors: " + errors;
+        if (errors >= 5) {
+          fillStatus.textContent += " — pausing. Fix network / wait, then Resume.";
+          fillState = "paused";
+          updateFillButtons();
+          await waitWhilePaused();
+          errors = 0;
+        } else {
+          await sleep(20000 + Math.floor(Math.random() * 5000));
+        }
+      } else {
+        errors = 0;
+        const delay = 15000 + Math.floor(Math.random() * 10000);
+        fillStatus.textContent =
+          "Cached @" + user + ". Next in ~" + Math.round(delay / 1000) + "s (" + (i + 1) + "/" + queue.length + ").";
+        await sleep(delay);
+      }
+    }
+    fillState = "idle";
+    updateFillButtons();
+    fillStatus.textContent = fillAbort ? "Fill stopped." : "Fill finished.";
+  }
+
+  fillStart.addEventListener("click", () => {
+    if (fillState === "idle") runSlowFill();
+  });
+  fillPause.addEventListener("click", () => {
+    if (fillState === "running") {
+      fillState = "paused";
+      fillStatus.textContent = "Paused. Resume when ready.";
+      updateFillButtons();
+    } else if (fillState === "paused") {
+      fillState = "running";
+      fillStatus.textContent = "Resumed.";
+      updateFillButtons();
+    }
+  });
+  fillStop.addEventListener("click", () => {
+    fillAbort = true;
+    fillState = "idle";
+    updateFillButtons();
+    fillStatus.textContent = "Stopping…";
+  });
+  updateFillButtons();
+
+  // Boot
+  lists = loadLists();
+  if (lists) renderLists();
+  else renderLists();
+  applyAll(loadLocal());
+  fetch(CACHE_API + "/cache").then(r => r.ok ? r.json() : null).then(remote => {
+    if (!remote) return;
+    const local = loadLocal();
+    Object.entries(remote).forEach(([k, v]) => { local[k] = { ...(local[k] || {}), ...v }; });
+    saveLocal(local);
+    applyAll(local);
+  }).catch(() => {});
+})();
+</script>
+</body>
+</html>

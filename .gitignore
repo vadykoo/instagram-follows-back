@@ -1,0 +1,13 @@
+.cache/
+__pycache__/
+*.pyc
+.DS_Store
+.env
+.env.*
+*.zip
+instagram-followback-cache.json
+**/instagram-*-cache.json
+instagram-*-json-for-nivune/
+instagram-*-html/
+.venv/
+venv/
